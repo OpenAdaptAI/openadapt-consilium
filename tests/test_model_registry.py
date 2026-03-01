@@ -675,6 +675,8 @@ class TestFiltering:
         assert _is_openai_chat_model("whisper-1") is False
         assert _is_openai_chat_model("gpt-4o-realtime-preview") is False
         assert _is_openai_chat_model("gpt-4o-audio-preview") is False
+        assert _is_openai_chat_model("gpt-image-1") is False
+        assert _is_openai_chat_model("gpt-4o-transcribe") is False
 
     def test_openai_lister_filters(self):
         """_list_openai returns only chat models from SDK response."""

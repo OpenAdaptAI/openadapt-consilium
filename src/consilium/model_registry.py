@@ -192,7 +192,10 @@ _SUPPORTED_PROVIDERS = {"openai", "anthropic", "google"}
 
 _OPENAI_ALLOW_RE = re.compile(r"^(gpt-|o[1-9])")
 _OPENAI_DENY_KEYWORDS = frozenset(
-    {"audio", "realtime", "tts", "dall-e", "whisper", "moderation", "embedding", "search"}
+    {
+        "audio", "realtime", "tts", "dall-e", "whisper", "moderation",
+        "embedding", "search", "image", "transcribe",
+    }
 )
 
 
