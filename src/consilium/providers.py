@@ -162,24 +162,23 @@ def _query_google(
     json_schema: dict | None = None,
 ) -> tuple[str, TokenUsage]:
     """Query a Google Gemini model."""
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
 
     api_key = _resolve_api_key("google", config.api_key)
-    genai.configure(api_key=api_key)
-
-    model = genai.GenerativeModel(
-        config.model, system_instruction=system
-    )
+    client = genai.Client(api_key=api_key)
 
     parts: list[Any] = []
     if images:
         for img_bytes in images:
-            parts.append({"mime_type": "image/png", "data": img_bytes})
+            parts.append(types.Part.from_bytes(data=img_bytes, mime_type="image/png"))
     parts.append(prompt)
 
-    resp = model.generate_content(
-        parts,
-        generation_config=genai.GenerationConfig(
+    resp = client.models.generate_content(
+        model=config.model,
+        contents=parts,
+        config=types.GenerateContentConfig(
+            system_instruction=system,
             temperature=config.temperature,
             max_output_tokens=config.max_tokens,
         ),
