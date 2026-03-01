@@ -1,8 +1,8 @@
-"""Cost tracking for LLM Council calls.
+"""Cost tracking for council calls.
 
 Tracks input/output tokens per call and estimates USD cost based on
-published pricing.  Prices are approximate and may drift -- update the
-``MODEL_PRICING`` dict as needed.
+published pricing. Prices are approximate — update ``MODEL_PRICING``
+as new models are released.
 """
 
 from __future__ import annotations
@@ -12,23 +12,23 @@ from typing import Dict
 
 
 # Pricing per 1M tokens (input, output) in USD.
-# Keep sorted alphabetically for easy scanning.
 MODEL_PRICING: Dict[str, tuple[float, float]] = {
     # Anthropic
-    "claude-opus-4": (15.0, 75.0),
-    "claude-sonnet-4": (3.0, 15.0),
-    "claude-sonnet-4-5": (3.0, 15.0),
-    "claude-opus-4-6": (15.0, 75.0),
+    "claude-haiku-4-5-20251001": (0.80, 4.0),
+    "claude-sonnet-4-5-20250514": (3.0, 15.0),
+    "claude-opus-4-20250514": (15.0, 75.0),
     # Google
+    "gemini-2.5-flash": (0.15, 0.60),
     "gemini-2.5-pro": (1.25, 10.0),
-    "gemini-3.5-pro": (1.25, 10.0),
     # OpenAI
-    "gpt-4o": (2.5, 10.0),
-    "gpt-4o-mini": (0.15, 0.60),
     "gpt-4.1": (2.0, 8.0),
     "gpt-4.1-mini": (0.4, 1.6),
-    "gpt-5.3": (2.0, 8.0),
+    "gpt-4.1-nano": (0.1, 0.4),
+    "gpt-4o": (2.5, 10.0),
+    "gpt-4o-mini": (0.15, 0.60),
+    "o3": (2.0, 8.0),
     "o3-mini": (1.1, 4.4),
+    "o4-mini": (1.1, 4.4),
 }
 
 # Fallback when model is not in the pricing table.
@@ -47,7 +47,9 @@ class TokenUsage:
     def cost_usd(self) -> float:
         """Estimated cost in USD."""
         input_rate, output_rate = MODEL_PRICING.get(self.model, DEFAULT_PRICING)
-        return (self.input_tokens * input_rate + self.output_tokens * output_rate) / 1_000_000
+        return (
+            self.input_tokens * input_rate + self.output_tokens * output_rate
+        ) / 1_000_000
 
 
 @dataclasses.dataclass
@@ -56,9 +58,13 @@ class CostTracker:
 
     usages: list[TokenUsage] = dataclasses.field(default_factory=list)
 
-    def record(self, model: str, input_tokens: int, output_tokens: int) -> TokenUsage:
+    def record(
+        self, model: str, input_tokens: int, output_tokens: int
+    ) -> TokenUsage:
         """Record a single API call and return the usage entry."""
-        usage = TokenUsage(model=model, input_tokens=input_tokens, output_tokens=output_tokens)
+        usage = TokenUsage(
+            model=model, input_tokens=input_tokens, output_tokens=output_tokens
+        )
         self.usages.append(usage)
         return usage
 
@@ -87,7 +93,10 @@ class CostTracker:
         for model, cost in sorted(self.breakdown_by_model().items()):
             lines.append(f"  {model}: ${cost:.4f}")
         lines.append(f"  TOTAL: ${self.total_cost:.4f}")
-        lines.append(f"  Tokens: {self.total_input_tokens} in / {self.total_output_tokens} out")
+        lines.append(
+            f"  Tokens: {self.total_input_tokens:,} in"
+            f" / {self.total_output_tokens:,} out"
+        )
         return "\n".join(lines)
 
     def exceeds_budget(self, budget: float | None) -> bool:

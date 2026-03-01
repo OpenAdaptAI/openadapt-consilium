@@ -1,79 +1,75 @@
-# consilium
+# Consilium
 
-Query multiple LLMs, cross-review, and synthesize the best answer.
+**Multi-LLM council for consensus-driven AI responses.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-
----
+Consilium queries multiple LLMs in parallel, has each model review the others' responses, then synthesizes the best answer through a chairman model. Inspired by [Karpathy's llm-council](https://github.com/karpathy/llm-council).
 
 ## How It Works
 
-consilium runs a 3-stage pipeline that produces higher-quality answers than any single model alone:
-
 ```
-                    +-------------------+
-                    |   Your Question   |
-                    +--------+----------+
-                             |
-              +--------------+--------------+
-              |              |              |
-        +-----v----+  +-----v----+  +------v---+
-        |  GPT-4o  |  |  Claude  |  |  Gemini  |   Stage 1: First Opinions
-        +-----+----+  +-----+----+  +------+---+
-              |              |              |
-              +--------------+--------------+
-                             |
-              +--------------+--------------+
-              |              |              |
-        +-----v----+  +-----v----+  +------v---+
-        |  GPT-4o  |  |  Claude  |  |  Gemini  |   Stage 2: Cross-Review
-        | reviews  |  | reviews  |  | reviews  |   (anonymized responses)
-        +-----+----+  +-----+----+  +------+---+
-              |              |              |
-              +--------------+--------------+
-                             |
-                    +--------v----------+
-                    |     Chairman      |       Stage 3: Synthesis
-                    |   (Claude S4.5)   |
-                    +--------+----------+
-                             |
-                    +--------v----------+
-                    |   Final Answer    |
-                    +-------------------+
+┌─────────────────────────────────────────────────────────┐
+│                    STAGE 1: QUERY                       │
+│                                                         │
+│   ┌─────────┐   ┌──────────┐   ┌─────────────────┐     │
+│   │ GPT-4.1 │   │ Claude   │   │ Gemini 2.5 Pro  │     │
+│   │         │   │ Sonnet   │   │                 │     │
+│   └────┬────┘   └────┬─────┘   └────────┬────────┘     │
+│        │             │                  │               │
+│        ▼             ▼                  ▼               │
+│   Response A    Response B         Response C           │
+└─────────────────────┬───────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────┐
+│                  STAGE 2: REVIEW                        │
+│                                                         │
+│   Each model reviews all anonymized responses.          │
+│   Ranks them best → worst with reasoning.               │
+└─────────────────────┬───────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────┐
+│                STAGE 3: SYNTHESIS                       │
+│                                                         │
+│   Chairman model synthesizes the best answer from       │
+│   all responses + reviews.                              │
+│                                                         │
+│              ┌──────────────────┐                       │
+│              │  Final Answer    │                       │
+│              └──────────────────┘                       │
+└─────────────────────────────────────────────────────────┘
 ```
-
-**Stage 1: First Opinions** -- All models receive the prompt in parallel and return independent answers.
-
-**Stage 2: Cross-Review** -- Each model receives all responses (anonymized as "Response A", "Response B", etc.) and reviews them, noting strengths, weaknesses, and a ranking.
-
-**Stage 3: Synthesis** -- A chairman model reads all responses and all reviews, then synthesizes the single best answer.
-
----
 
 ## Installation
 
 ```bash
-pip install consilium
+pip install git+https://github.com/abrichr/consilium.git
 ```
 
-To include Google Gemini support:
+Or for development:
 
 ```bash
-pip install consilium[all]
+git clone https://github.com/abrichr/consilium.git
+cd consilium
+pip install -e ".[dev]"
 ```
-
----
 
 ## Quick Start
 
-### Python
+Set your API keys:
+
+```bash
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+export GOOGLE_API_KEY="AI..."
+```
+
+### Python API
 
 ```python
-from consilium import LLMCouncil
+from consilium import Council
 
-council = LLMCouncil()
-result = council.ask("What causes the northern lights?")
+council = Council()
+result = council.ask("What are the key differences between REST and GraphQL?")
+
 print(result.final_answer)
 print(result.cost_summary())
 ```
@@ -81,281 +77,186 @@ print(result.cost_summary())
 ### CLI
 
 ```bash
-consilium "What causes the northern lights?"
+consilium "What are the key differences between REST and GraphQL?"
 ```
 
----
+## API Reference
 
-## CLI Reference
+### `Council`
 
-```
-consilium PROMPT [OPTIONS]
-```
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `PROMPT` | The question or prompt to send (positional, required) | -- |
-| `--models` | Comma-separated model identifiers | `gpt-4o,claude-sonnet-4-5,gemini-2.5-pro` |
-| `--chairman` | Chairman model for Stage 3 synthesis | `claude-sonnet-4-5` |
-| `--image` | Path to an image file (can be repeated) | -- |
-| `--budget` | Maximum spend in USD | unlimited |
-| `--no-review` | Skip Stages 2-3; show only individual responses | `false` |
-| `--system` | System prompt prepended to all model calls | -- |
-| `--json` | Output raw JSON instead of formatted text | `false` |
-
-### Examples
-
-```bash
-# Basic query with defaults (GPT-4o + Claude + Gemini)
-consilium "Explain quantum entanglement in plain English"
-
-# Specific models, no cross-review
-consilium "Write a haiku about rain" --models gpt-4o,claude-sonnet-4-5 --no-review
-
-# Image analysis with budget cap
-consilium "Describe this diagram" --image architecture.png --budget 0.25
-
-# JSON output for scripting
-consilium "List 3 sorting algorithms" --json | jq '.final_answer'
-
-# Custom system prompt
-consilium "Review this code" --system "You are a senior software engineer."
-```
-
----
-
-## Python SDK
-
-### LLMCouncil class
-
-Full control over the council pipeline:
+The main orchestrator class.
 
 ```python
-from consilium import LLMCouncil
+from consilium import Council
 
-council = LLMCouncil(
-    models=["gpt-4o", "claude-sonnet-4-5", "gemini-2.5-pro"],
-    chairman="claude-sonnet-4-5",
+council = Council(
+    models=["gpt-4.1", "claude-sonnet-4-5-20250514", "gemini-2.5-pro"],
+    chairman="claude-sonnet-4-5-20250514",
     max_workers=8,
 )
-
-result = council.ask(
-    "Compare REST and GraphQL for a mobile app backend.",
-    budget=0.50,
-    system="You are a backend architect with 10 years of experience.",
-)
-
-# Access results
-print(result.final_answer)
-print(result.individual_responses)  # list of IndividualResponse
-print(result.reviews)               # list of Review
-print(result.cost_summary())        # formatted cost breakdown
-print(result.total_cost)            # float, USD
 ```
 
-### council_query() function
+**Parameters:**
 
-Simplified dict-based interface for agents and scripts:
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `models` | `list[str]` | `["gpt-4.1", "claude-sonnet-4-5-20250514", "gemini-2.5-pro"]` | Models to query in Stage 1 |
+| `chairman` | `str` | `"claude-sonnet-4-5-20250514"` | Model for Stage 3 synthesis |
+| `max_workers` | `int` | `8` | Max parallel threads |
+
+#### `council.ask()`
+
+```python
+result = council.ask(
+    "Your question here",
+    images=[open("screenshot.png", "rb").read()],  # optional
+    budget=0.50,        # max USD spend
+    system="Be concise",  # system prompt for all models
+    skip_review=False,  # skip Stages 2-3
+    json_schema={...},  # request JSON output
+)
+```
+
+**Returns:** `CouncilResult`
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `result.final_answer` | `str` | Synthesized best answer |
+| `result.individual_responses` | `list` | Each model's Stage 1 response |
+| `result.reviews` | `list` | Each model's Stage 2 review |
+| `result.total_cost` | `float` | Total estimated cost in USD |
+| `result.total_latency_seconds` | `float` | Wall-clock time |
+| `result.cost_summary()` | `str` | Pretty-printed cost breakdown |
+
+### Agent SDK
+
+For AI agents and automated pipelines, use the dict-based interface:
 
 ```python
 from consilium import council_query
 
 result = council_query(
-    "What are the SOLID principles?",
-    models=["gpt-4o", "claude-sonnet-4-5"],
-    budget=0.30,
+    "Analyze this screenshot and list the UI elements",
+    images=[screenshot_bytes],
+    models=["gpt-4.1", "claude-sonnet-4-5-20250514"],
+    budget=0.25,
+    skip_review=True,  # fast mode: Stage 1 only
 )
 
 print(result["final_answer"])
 print(result["cost"]["total_usd"])
 ```
 
-Returns a plain dict:
+**Returns:** JSON-serializable `dict` with keys:
 
 ```json
 {
   "final_answer": "...",
   "individual_responses": [
     {
-      "model": "openai/gpt-4o",
+      "model": "openai/gpt-4.1",
       "text": "...",
-      "latency_seconds": 1.234,
-      "input_tokens": 150,
+      "latency_seconds": 2.1,
+      "input_tokens": 1500,
       "output_tokens": 400,
-      "cost_usd": 0.004375
+      "cost_usd": 0.007
     }
   ],
   "reviews": [...],
   "cost": {
-    "breakdown": {"gpt-4o": 0.004, "claude-sonnet-4-5": 0.005},
-    "total_usd": 0.009,
-    "total_input_tokens": 300,
+    "breakdown": {"gpt-4.1": 0.007, "claude-sonnet-4-5-20250514": 0.012},
+    "total_usd": 0.019,
+    "total_input_tokens": 3000,
     "total_output_tokens": 800
   },
-  "total_latency_seconds": 3.456
+  "total_latency_seconds": 3.2
 }
 ```
 
-### Image support
+### CLI Reference
 
-Pass PNG image bytes for vision-capable models:
+```
+consilium "prompt" [OPTIONS]
 
-```python
-with open("screenshot.png", "rb") as f:
-    image_data = f.read()
-
-result = council.ask(
-    "What application is shown in this screenshot?",
-    images=[image_data],
-)
+Options:
+  --models TEXT      Comma-separated model IDs (default: gpt-4.1,claude-sonnet-4-5-20250514,gemini-2.5-pro)
+  --chairman TEXT    Chairman model for synthesis (default: claude-sonnet-4-5-20250514)
+  --image PATH      Image file to include (repeatable)
+  --budget FLOAT    Max spend in USD
+  --no-review       Skip Stages 2-3 (faster, cheaper)
+  --system TEXT     System prompt for all models
+  --json            Output raw JSON
 ```
 
-### Budget control
+**Examples:**
 
-Set a maximum spend in USD. If Stage 1 exceeds the budget, Stages 2-3 are skipped automatically:
+```bash
+# Full 3-stage pipeline
+consilium "Compare Python and Rust for CLI tools"
+
+# Fast mode (Stage 1 only)
+consilium "Summarize this" --no-review
+
+# With screenshot
+consilium "What's on this screen?" --image screenshot.png
+
+# Budget-limited
+consilium "Write a haiku about AI" --budget 0.10
+
+# JSON output for piping
+consilium "List 3 colors" --json | jq '.final_answer'
+
+# Custom models
+consilium "Hello" --models gpt-4.1,gemini-2.5-pro --chairman gpt-4.1
+```
+
+## Model Support
+
+Consilium supports any model from these providers:
+
+| Provider | Models | Env Var |
+|----------|--------|---------|
+| OpenAI | `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `o3`, `o4-mini` | `OPENAI_API_KEY` |
+| Anthropic | `claude-sonnet-4-5-20250514`, `claude-opus-4-20250514`, `claude-haiku-4-5-20251001` | `ANTHROPIC_API_KEY` |
+| Google | `gemini-2.5-pro`, `gemini-2.5-flash` | `GOOGLE_API_KEY` |
+
+Use any model with the `provider/model` format:
+
+```python
+council = Council(models=["openai/gpt-4.1", "anthropic/claude-sonnet-4-5-20250514"])
+```
+
+## Budget Control
+
+Consilium tracks costs in real-time and can halt the pipeline when a budget is exceeded:
 
 ```python
 result = council.ask("Expensive question", budget=0.10)
 
-if not result.reviews:
-    print("Budget exceeded after Stage 1 -- reviews were skipped")
+# If Stage 1 costs > $0.10, Stages 2-3 are automatically skipped
+# The best Stage 1 response is returned as the final answer
 ```
 
-### Custom models
+## Error Handling
 
-Use `provider/model` format for any model, or shorthand aliases:
+Individual model failures don't crash the council — failed responses are marked with `[ERROR: ...]` and the remaining models continue:
 
 ```python
-from consilium.providers import ProviderConfig
-
-council = LLMCouncil(
-    models=[
-        "gpt-4o",                    # shorthand alias
-        "openai/gpt-4.1",            # explicit provider/model
-        ProviderConfig(               # full config object
-            provider="anthropic",
-            model="claude-opus-4",
-            temperature=0.3,
-            max_tokens=8192,
-        ),
-    ],
-    chairman="claude-sonnet-4-5",
-)
+result = council.ask("Test")
+for r in result.individual_responses:
+    if r.text.startswith("[ERROR:"):
+        print(f"{r.model} failed: {r.text}")
 ```
 
----
+## Development
 
-## Agent SDK
-
-The `council_query()` function is designed for programmatic use in AI agent pipelines. It accepts and returns plain dicts and strings, making it straightforward to integrate:
-
-```python
-from consilium import council_query
-
-def agent_step(observation: str) -> str:
-    """Use the council to decide the next action."""
-    result = council_query(
-        f"Given this observation, what action should I take?\n\n{observation}",
-        models=["gpt-4o", "claude-sonnet-4-5"],
-        budget=0.05,
-        skip_review=True,  # fast mode for real-time agents
-    )
-    return result["final_answer"]
+```bash
+git clone https://github.com/abrichr/consilium.git
+cd consilium
+pip install -e ".[dev]"
+pytest
 ```
-
-For structured output, pass a `json_schema` parameter:
-
-```python
-result = council_query(
-    "List the top 3 actions to take.",
-    json_schema={"type": "object", "properties": {"actions": {"type": "array"}}},
-)
-```
-
----
-
-## Cost Tracking
-
-Every query tracks token usage and estimated cost:
-
-```python
-result = council.ask("What is the meaning of life?")
-print(result.cost_summary())
-```
-
-Output:
-
-```
-Cost breakdown:
-  claude-sonnet-4-5: $0.0123
-  gemini-2.5-pro: $0.0045
-  gpt-4o: $0.0089
-  TOTAL: $0.0257
-  Tokens: 1250 in / 890 out
-```
-
-Access programmatically:
-
-```python
-result.total_cost          # float, total USD
-result.cost_breakdown      # dict: model -> USD
-result.cost_tracker        # CostTracker with full detail
-```
-
----
-
-## Supported Models
-
-| Alias | Provider | Model |
-|-------|----------|-------|
-| `gpt-4o` | openai | gpt-4o |
-| `gpt-4o-mini` | openai | gpt-4o-mini |
-| `gpt-4.1` | openai | gpt-4.1 |
-| `gpt-4.1-mini` | openai | gpt-4.1-mini |
-| `gpt-5.3` | openai | gpt-5.3 |
-| `o3-mini` | openai | o3-mini |
-| `claude-sonnet-4-5` | anthropic | claude-sonnet-4-5 |
-| `claude-sonnet-4` | anthropic | claude-sonnet-4 |
-| `claude-opus-4` | anthropic | claude-opus-4 |
-| `claude-opus-4-6` | anthropic | claude-opus-4-6 |
-| `gemini-2.5-pro` | google | gemini-2.5-pro |
-| `gemini-3.5-pro` | google | gemini-3.5-pro |
-
-Any model can also be specified as `provider/model` (e.g., `openai/gpt-4o`).
-
----
-
-## Configuration
-
-consilium reads API keys from environment variables:
-
-| Variable | Provider |
-|----------|----------|
-| `OPENAI_API_KEY` | OpenAI (GPT-4o, o3-mini, etc.) |
-| `ANTHROPIC_API_KEY` | Anthropic (Claude) |
-| `GOOGLE_API_KEY` | Google (Gemini) -- requires `consilium[google]` |
-
-You can also pass keys explicitly:
-
-```python
-from consilium.providers import ProviderConfig
-
-config = ProviderConfig(
-    provider="openai",
-    model="gpt-4o",
-    api_key="sk-...",
-)
-council = LLMCouncil(models=[config])
-```
-
----
-
-## Inspired By
-
-This project is inspired by Andrej Karpathy's [llm-council](https://github.com/karpathy/llm-council), which demonstrates the value of querying multiple LLMs and having them review each other's work.
-
----
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT

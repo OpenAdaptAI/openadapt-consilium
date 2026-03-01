@@ -9,18 +9,16 @@ Example::
 
     result = council_query(
         "What are the steps to open Notepad on Windows 11?",
-        models=["gpt-4o", "claude-sonnet-4-5"],
+        models=["gpt-4.1", "claude-sonnet-4-5-20250514"],
     )
     print(result["final_answer"])
 """
 
 from __future__ import annotations
 
-import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
-from consilium.core import CouncilResult, LLMCouncil
-from consilium.providers import ProviderConfig
+from consilium.core import Council, CouncilResult
 
 
 def council_query(
@@ -34,29 +32,25 @@ def council_query(
     skip_review: bool = False,
     json_schema: dict | None = None,
 ) -> Dict[str, Any]:
-    """Query the LLM council and return a structured dict result.
+    """Query the LLM council and return a structured dict.
 
     This is the primary programmatic entry point for agents and scripts.
 
     Args:
         question: The question / prompt to send.
         images: Optional list of image bytes (PNG).
-        models: Model identifiers (e.g. ``["gpt-4o", "claude-sonnet-4-5"]``).
+        models: Model identifiers (e.g. ``["gpt-4.1", "claude-sonnet-4-5-20250514"]``).
         chairman: Chairman model identifier.
         budget: Maximum spend in USD.
         system: Optional system prompt.
-        skip_review: If True, skip Stages 2-3.
+        skip_review: If ``True``, skip Stages 2-3.
         json_schema: If set, request structured JSON output from each model.
 
     Returns:
-        Dict with keys:
-        - ``final_answer`` (str): Synthesized answer from the chairman.
-        - ``individual_responses`` (list[dict]): Each model's response.
-        - ``reviews`` (list[dict]): Each model's review (empty if skipped).
-        - ``cost`` (dict): Cost breakdown by model and total.
-        - ``total_latency_seconds`` (float): Wall-clock time.
+        Dict with keys ``final_answer``, ``individual_responses``,
+        ``reviews``, ``cost``, ``total_latency_seconds``.
     """
-    council = LLMCouncil(models=models, chairman=chairman)
+    council = Council(models=models, chairman=chairman)
     result: CouncilResult = council.ask(
         question,
         images=images,

@@ -1,11 +1,12 @@
-"""CLI entry point for consilium.
+"""CLI entry point for Consilium.
 
 Usage::
 
     consilium "What color is the sky?"
     consilium "Describe this screenshot" --image screenshot.png
-    consilium "Hello" --models gpt-4o,claude-sonnet-4-5 --no-review
+    consilium "Hello" --models gpt-4.1,claude-sonnet-4-5-20250514 --no-review
     consilium "Plan a trip" --budget 0.50
+    consilium "Compare approaches" --json
 """
 
 from __future__ import annotations
@@ -15,25 +16,23 @@ import json
 import sys
 import textwrap
 
-from consilium.core import LLMCouncil
+from consilium.core import Council
 from consilium.providers import DEFAULT_CHAIRMAN, DEFAULT_MODELS
 
 
 def _read_image(path: str) -> bytes:
-    """Read an image file and return raw bytes."""
     with open(path, "rb") as f:
         return f.read()
 
 
 def _pretty_print(result, skip_review: bool) -> None:
-    """Pretty-print a CouncilResult to stdout."""
     separator = "=" * 72
 
     # Stage 1
     print(f"\n{separator}")
     print("STAGE 1: INDIVIDUAL RESPONSES")
     print(separator)
-    for i, resp in enumerate(result.individual_responses):
+    for resp in result.individual_responses:
         print(f"\n--- {resp.model} ({resp.latency_seconds:.1f}s) ---")
         print(textwrap.fill(resp.text, width=80))
 
@@ -42,14 +41,17 @@ def _pretty_print(result, skip_review: bool) -> None:
         print(f"\n{separator}")
         print("STAGE 2: REVIEWS")
         print(separator)
-        for i, rev in enumerate(result.reviews):
-            print(f"\n--- Review by {rev.reviewer_model} ({rev.latency_seconds:.1f}s) ---")
+        for rev in result.reviews:
+            print(
+                f"\n--- Review by {rev.reviewer_model}"
+                f" ({rev.latency_seconds:.1f}s) ---"
+            )
             print(textwrap.fill(rev.review_text, width=80))
 
     # Stage 3
     if not skip_review and result.reviews:
         print(f"\n{separator}")
-        print("STAGE 3: CHAIRMAN'S FINAL ANSWER")
+        print("STAGE 3: CHAIRMAN'S SYNTHESIS")
         print(separator)
         print()
         print(textwrap.fill(result.final_answer, width=80))
@@ -64,27 +66,47 @@ def _pretty_print(result, skip_review: bool) -> None:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="consilium",
-        description="Query multiple LLMs, cross-review, and synthesize the best answer.",
+        description=(
+            "Query multiple LLMs, cross-review responses, and synthesize "
+            "the best answer."
+        ),
     )
     parser.add_argument("prompt", help="The question or prompt to send.")
     parser.add_argument(
         "--models",
         default=",".join(DEFAULT_MODELS),
-        help=f"Comma-separated model identifiers. Default: {','.join(DEFAULT_MODELS)}",
+        help=(
+            f"Comma-separated model identifiers. "
+            f"Default: {','.join(DEFAULT_MODELS)}"
+        ),
     )
     parser.add_argument(
         "--chairman",
         default=DEFAULT_CHAIRMAN,
-        help=f"Chairman model. Default: {DEFAULT_CHAIRMAN}",
+        help=f"Chairman model for synthesis. Default: {DEFAULT_CHAIRMAN}",
     )
-    parser.add_argument("--image", action="append", dest="images", help="Path to an image file.")
-    parser.add_argument("--budget", type=float, default=None, help="Max spend in USD.")
+    parser.add_argument(
+        "--image",
+        action="append",
+        dest="images",
+        help="Path to an image file (can be repeated).",
+    )
+    parser.add_argument(
+        "--budget",
+        type=float,
+        default=None,
+        help="Max spend in USD.",
+    )
     parser.add_argument(
         "--no-review",
         action="store_true",
         help="Skip Stages 2-3; just show individual responses.",
     )
-    parser.add_argument("--system", default=None, help="System prompt for all models.")
+    parser.add_argument(
+        "--system",
+        default=None,
+        help="System prompt for all models.",
+    )
     parser.add_argument(
         "--json",
         action="store_true",
@@ -93,15 +115,13 @@ def main(argv: list[str] | None = None) -> None:
 
     args = parser.parse_args(argv)
 
-    # Parse models
     model_list = [m.strip() for m in args.models.split(",") if m.strip()]
 
-    # Load images
     image_bytes = None
     if args.images:
         image_bytes = [_read_image(p) for p in args.images]
 
-    council = LLMCouncil(models=model_list, chairman=args.chairman)
+    council = Council(models=model_list, chairman=args.chairman)
     result = council.ask(
         args.prompt,
         images=image_bytes,

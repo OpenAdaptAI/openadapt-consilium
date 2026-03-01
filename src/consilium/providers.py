@@ -1,7 +1,7 @@
-"""LLM provider adapters for the council.
+"""LLM provider adapters.
 
-Each provider implements :func:`query` which accepts a text prompt and
-optional base64-encoded images, returning (response_text, token_usage).
+Each provider implements a query function that accepts a text prompt and
+optional images, returning ``(response_text, token_usage)``.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 import base64
 import dataclasses
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from consilium.cost import TokenUsage
 
@@ -19,7 +19,7 @@ class ProviderConfig:
     """Configuration for a single LLM provider/model."""
 
     provider: str  # "openai", "anthropic", "google"
-    model: str  # e.g. "gpt-4o", "claude-sonnet-4-5", "gemini-3.5-pro"
+    model: str  # e.g. "gpt-4.1", "claude-sonnet-4-5-20250514"
     api_key: str | None = None  # falls back to env var
     temperature: float = 0.7
     max_tokens: int = 4096
@@ -30,7 +30,7 @@ class ProviderConfig:
 
 
 def _resolve_api_key(provider: str, explicit_key: str | None) -> str:
-    """Resolve API key from explicit value or environment variable."""
+    """Resolve API key from explicit value or env var."""
     if explicit_key:
         return explicit_key
 
@@ -64,7 +64,7 @@ def _query_openai(
     system: str | None = None,
     json_schema: dict | None = None,
 ) -> tuple[str, TokenUsage]:
-    """Query an OpenAI model."""
+    """Query an OpenAI-compatible model."""
     import openai
 
     api_key = _resolve_api_key("openai", config.api_key)
@@ -74,7 +74,6 @@ def _query_openai(
     if system:
         messages.append({"role": "system", "content": system})
 
-    # Build user message with optional images
     content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
     if images:
         for img_bytes in images:
@@ -162,15 +161,14 @@ def _query_google(
     system: str | None = None,
     json_schema: dict | None = None,
 ) -> tuple[str, TokenUsage]:
-    """Query a Google Gemini model via google.generativeai."""
+    """Query a Google Gemini model."""
     import google.generativeai as genai
 
     api_key = _resolve_api_key("google", config.api_key)
     genai.configure(api_key=api_key)
 
     model = genai.GenerativeModel(
-        config.model,
-        system_instruction=system,
+        config.model, system_instruction=system
     )
 
     parts: list[Any] = []
@@ -188,12 +186,15 @@ def _query_google(
     )
     text = resp.text or ""
 
-    # Gemini usage metadata
     input_tokens = 0
     output_tokens = 0
     if hasattr(resp, "usage_metadata") and resp.usage_metadata:
-        input_tokens = getattr(resp.usage_metadata, "prompt_token_count", 0) or 0
-        output_tokens = getattr(resp.usage_metadata, "candidates_token_count", 0) or 0
+        input_tokens = (
+            getattr(resp.usage_metadata, "prompt_token_count", 0) or 0
+        )
+        output_tokens = (
+            getattr(resp.usage_metadata, "candidates_token_count", 0) or 0
+        )
 
     usage = TokenUsage(
         model=config.model,
@@ -231,7 +232,7 @@ def query_model(
         json_schema: If set, request JSON output (best-effort).
 
     Returns:
-        (response_text, TokenUsage)
+        ``(response_text, TokenUsage)``
     """
     fn = _PROVIDERS.get(config.provider)
     if fn is None:
@@ -239,33 +240,38 @@ def query_model(
             f"Unknown provider '{config.provider}'. "
             f"Supported: {sorted(_PROVIDERS.keys())}"
         )
-    return fn(config, prompt, images=images, system=system, json_schema=json_schema)
+    return fn(
+        config, prompt, images=images, system=system, json_schema=json_schema
+    )
 
 
 # ---------------------------------------------------------------------------
-# Convenience: parse "provider/model" shorthand
+# Parse "provider/model" shorthand
 # ---------------------------------------------------------------------------
 
-# Shorthand aliases for common models
 MODEL_ALIASES: Dict[str, tuple[str, str]] = {
-    "gpt-4o": ("openai", "gpt-4o"),
-    "gpt-4o-mini": ("openai", "gpt-4o-mini"),
+    # OpenAI
     "gpt-4.1": ("openai", "gpt-4.1"),
     "gpt-4.1-mini": ("openai", "gpt-4.1-mini"),
-    "gpt-5.3": ("openai", "gpt-5.3"),
+    "gpt-4.1-nano": ("openai", "gpt-4.1-nano"),
+    "gpt-4o": ("openai", "gpt-4o"),
+    "gpt-4o-mini": ("openai", "gpt-4o-mini"),
+    "o3": ("openai", "o3"),
     "o3-mini": ("openai", "o3-mini"),
-    "claude-sonnet-4-5": ("anthropic", "claude-sonnet-4-5"),
-    "claude-sonnet-4": ("anthropic", "claude-sonnet-4"),
-    "claude-opus-4": ("anthropic", "claude-opus-4"),
-    "claude-opus-4-6": ("anthropic", "claude-opus-4-6"),
+    "o4-mini": ("openai", "o4-mini"),
+    # Anthropic
+    "claude-haiku-4-5-20251001": ("anthropic", "claude-haiku-4-5-20251001"),
+    "claude-sonnet-4-5-20250514": ("anthropic", "claude-sonnet-4-5-20250514"),
+    "claude-opus-4-20250514": ("anthropic", "claude-opus-4-20250514"),
+    # Google
+    "gemini-2.5-flash": ("google", "gemini-2.5-flash"),
     "gemini-2.5-pro": ("google", "gemini-2.5-pro"),
-    "gemini-3.5-pro": ("google", "gemini-3.5-pro"),
 }
 
 
 def parse_model_string(model_str: str) -> ProviderConfig:
-    """Parse a model string like ``"gpt-4o"`` or ``"openai/gpt-4o"`` into a
-    :class:`ProviderConfig`.
+    """Parse a model string like ``"gpt-4.1"`` or ``"openai/gpt-4.1"``
+    into a :class:`ProviderConfig`.
     """
     if "/" in model_str:
         provider, model = model_str.split("/", 1)
@@ -281,11 +287,11 @@ def parse_model_string(model_str: str) -> ProviderConfig:
     )
 
 
-# Default council composition
+# Default council composition — latest flagship from each provider
 DEFAULT_MODELS: List[str] = [
-    "gpt-4o",
-    "claude-sonnet-4-5",
+    "gpt-4.1",
+    "claude-sonnet-4-5-20250514",
     "gemini-2.5-pro",
 ]
 
-DEFAULT_CHAIRMAN: str = "claude-sonnet-4-5"
+DEFAULT_CHAIRMAN: str = "claude-sonnet-4-5-20250514"
