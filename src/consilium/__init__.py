@@ -18,7 +18,14 @@ Usage::
 """
 
 from consilium.core import Council, CouncilResult
+from consilium.model_registry import get_latest, list_models
 from consilium.sdk import council_query
 
 __version__ = "0.1.0"
-__all__ = ["Council", "CouncilResult", "council_query"]
+__all__ = [
+    "Council",
+    "CouncilResult",
+    "council_query",
+    "get_latest",
+    "list_models",
+]

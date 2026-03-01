@@ -19,6 +19,7 @@ from consilium.providers import (
     DEFAULT_CHAIRMAN,
     DEFAULT_MODELS,
     ProviderConfig,
+    get_default_models,
     parse_model_string,
     query_model,
 )
@@ -101,7 +102,7 @@ class Council:
         chairman: str | ProviderConfig | None = None,
         max_workers: int = 8,
     ) -> None:
-        raw_models = models or DEFAULT_MODELS
+        raw_models = models if models is not None else get_default_models()
         self.configs: List[ProviderConfig] = [
             m if isinstance(m, ProviderConfig) else parse_model_string(m)
             for m in raw_models

@@ -304,3 +304,22 @@ DEFAULT_MODELS: List[str] = [
 ]
 
 DEFAULT_CHAIRMAN: str = "claude-sonnet-4-6"
+
+
+def get_default_models() -> List[str]:
+    """Return default model IDs, auto-detecting latest via provider APIs.
+
+    Tries :func:`model_registry.get_default_models` first, falling back
+    to the hardcoded :data:`DEFAULT_MODELS` on any error.
+    """
+    try:
+        from consilium.model_registry import (
+            get_default_models as _registry_defaults,
+        )
+
+        models = _registry_defaults()
+        if models:
+            return models
+    except Exception:
+        pass
+    return list(DEFAULT_MODELS)
