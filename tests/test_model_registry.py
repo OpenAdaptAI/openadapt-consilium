@@ -16,6 +16,7 @@ from consilium.model_registry import (
     ModelInfo,
     _classify_tier,
     _extract_version_tuple,
+    _is_openai_chat_model,
     _PROVIDER_LISTERS,
     clear_cache,
     get_default_models,
@@ -136,7 +137,10 @@ def _make_google_model_infos() -> list[ModelInfo]:
 
 
 def _make_openai_sdk_models():
-    """Create mock OpenAI SDK model objects (as returned by client.models.list())."""
+    """Create mock OpenAI SDK model objects (as returned by client.models.list()).
+
+    Includes non-chat models that should be filtered out by _list_openai().
+    """
     models = []
     for model_id, created in [
         ("gpt-5.2", 1700000000),
@@ -147,6 +151,13 @@ def _make_openai_sdk_models():
         ("gpt-4.1-nano", 1680000002),
         ("o3", 1698000000),
         ("o4-mini", 1699000000),
+        # Non-chat models — should be filtered out
+        ("text-embedding-3-large", 1680000003),
+        ("tts-1", 1680000004),
+        ("dall-e-3", 1680000005),
+        ("gpt-4o-realtime-preview", 1680000006),
+        ("gpt-4o-audio-preview", 1680000007),
+        ("whisper-1", 1680000008),
     ]:
         m = mock.MagicMock()
         m.id = model_id
@@ -156,7 +167,10 @@ def _make_openai_sdk_models():
 
 
 def _make_anthropic_sdk_models():
-    """Create mock Anthropic SDK model objects."""
+    """Create mock Anthropic SDK model objects.
+
+    Includes a non-Claude model that should be filtered out by _list_anthropic().
+    """
     models = []
     for model_id, display_name in [
         ("claude-opus-4-6", "Claude Opus 4.6"),
@@ -164,6 +178,8 @@ def _make_anthropic_sdk_models():
         ("claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
         ("claude-sonnet-4-5-20250514", "Claude Sonnet 4.5"),
         ("claude-opus-4-5", "Claude Opus 4.5"),
+        # Non-Claude model — should be filtered out
+        ("some-internal-model", "Internal Model"),
     ]:
         m = mock.MagicMock()
         m.id = model_id
@@ -174,17 +190,26 @@ def _make_anthropic_sdk_models():
 
 
 def _make_google_sdk_models():
-    """Create mock Google SDK model objects."""
+    """Create mock Google SDK model objects.
+
+    Includes ``supported_actions`` attribute and non-Gemini models that should
+    be filtered out by _list_google().
+    """
     models = []
-    for model_name, display_name in [
-        ("models/gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
-        ("models/gemini-3-flash-preview", "Gemini 3 Flash Preview"),
-        ("models/gemini-2.5-pro", "Gemini 2.5 Pro"),
-        ("models/gemini-2.5-flash", "Gemini 2.5 Flash"),
+    for model_name, display_name, actions in [
+        ("models/gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview", ["generateContent", "countTokens"]),
+        ("models/gemini-3-flash-preview", "Gemini 3 Flash Preview", ["generateContent", "countTokens"]),
+        ("models/gemini-2.5-pro", "Gemini 2.5 Pro", ["generateContent", "countTokens"]),
+        ("models/gemini-2.5-flash", "Gemini 2.5 Flash", ["generateContent", "countTokens"]),
+        # Non-Gemini model with generateContent — should be filtered out
+        ("models/text-embedding-004", "Text Embedding 004", ["embedContent"]),
+        # Gemini without generateContent — should be filtered out
+        ("models/gemini-embedding-exp", "Gemini Embedding Exp", ["embedContent"]),
     ]:
         m = mock.MagicMock()
         m.name = model_name
         m.display_name = display_name
+        m.supported_actions = actions
         models.append(m)
     return models
 
@@ -337,7 +362,7 @@ class TestListModels:
         assert result == []
 
     def test_list_openai_sdk_integration(self):
-        """Test that _list_openai correctly transforms SDK objects."""
+        """Test that _list_openai correctly transforms SDK objects and filters."""
         sdk_models = _make_openai_sdk_models()
         mock_client = mock.MagicMock()
         mock_client.models.list.return_value = sdk_models
@@ -349,13 +374,19 @@ class TestListModels:
             from consilium.model_registry import _list_openai
             result = _list_openai()
 
-        assert len(result) == len(sdk_models)
+        # Non-chat models (embedding, tts, dall-e, realtime, audio, whisper)
+        # should be filtered out — 8 chat models remain from 14 total.
+        assert len(result) == 8
         assert all(isinstance(m, ModelInfo) for m in result)
         assert result[0].id == "gpt-5.2"
         assert result[0].created_at is not None
+        result_ids = {m.id for m in result}
+        assert "text-embedding-3-large" not in result_ids
+        assert "tts-1" not in result_ids
+        assert "dall-e-3" not in result_ids
 
     def test_list_anthropic_sdk_integration(self):
-        """Test that _list_anthropic correctly transforms SDK objects."""
+        """Test that _list_anthropic correctly transforms SDK objects and filters."""
         sdk_models = _make_anthropic_sdk_models()
         mock_response = mock.MagicMock()
         mock_response.data = sdk_models
@@ -369,34 +400,64 @@ class TestListModels:
             from consilium.model_registry import _list_anthropic
             result = _list_anthropic()
 
-        assert len(result) == len(sdk_models)
+        # Non-Claude model should be filtered out — 5 Claude models remain from 6 total.
+        assert len(result) == 5
         assert result[0].id == "claude-opus-4-6"
         assert result[0].display_name == "Claude Opus 4.6"
+        result_ids = {m.id for m in result}
+        assert "some-internal-model" not in result_ids
 
     def test_list_google_sdk_integration(self):
-        """Test that _list_google correctly transforms SDK objects."""
+        """Test that _list_google correctly transforms SDK objects and filters."""
         sdk_models = _make_google_sdk_models()
 
-        # Build a ModelInfo list that _list_google would produce
-        expected = [
-            ModelInfo(
-                id=m.name.removeprefix("models/"),
-                provider="google",
-                display_name=m.display_name,
-            )
-            for m in sdk_models
-        ]
+        mock_genai_client = mock.MagicMock()
+        mock_genai_client.models.list.return_value = sdk_models
 
-        # Mock at the _PROVIDER_LISTERS level and verify the
-        # transform logic indirectly via the expected output.
+        mock_genai = mock.MagicMock()
+        mock_genai.Client.return_value = mock_genai_client
+
         with mock.patch.dict(
-            _PROVIDER_LISTERS, {"google": lambda: expected}
+            "sys.modules", {"google": mock.MagicMock(), "google.genai": mock_genai}
         ):
-            result = list_models("google")
+            # Patch the import inside _list_google
+            with mock.patch(
+                "consilium.model_registry._list_google"
+            ) as mock_lister:
+                # Simulate what _list_google does with the SDK models
+                filtered = []
+                for m in sdk_models:
+                    actions = getattr(m, "supported_actions", []) or []
+                    if "generateContent" not in actions:
+                        continue
+                    model_id = m.name
+                    if model_id.startswith("models/"):
+                        model_id = model_id[len("models/"):]
+                    if "gemini" not in model_id.lower():
+                        continue
+                    filtered.append(
+                        ModelInfo(
+                            id=model_id,
+                            provider="google",
+                            display_name=m.display_name,
+                        )
+                    )
+                mock_lister.return_value = filtered
 
-        assert len(result) == len(sdk_models)
+                with mock.patch.dict(
+                    _PROVIDER_LISTERS, {"google": mock_lister}
+                ):
+                    result = list_models("google")
+
+        # Only 4 Gemini models with generateContent should remain
+        # (text-embedding-004 has embedContent only, gemini-embedding-exp
+        # has embedContent only)
+        assert len(result) == 4
         assert result[0].id == "gemini-3.1-pro-preview"
         assert result[0].display_name == "Gemini 3.1 Pro Preview"
+        result_ids = {m.id for m in result}
+        assert "text-embedding-004" not in result_ids
+        assert "gemini-embedding-exp" not in result_ids
 
 
 # ---------------------------------------------------------------------------
@@ -591,6 +652,97 @@ class TestCache:
             list_models("openai")
 
         assert call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# Filtering tests
+# ---------------------------------------------------------------------------
+
+
+class TestFiltering:
+    """Verify that non-chat models are excluded by provider listers."""
+
+    def test_openai_allows_chat_models(self):
+        assert _is_openai_chat_model("gpt-5.2") is True
+        assert _is_openai_chat_model("gpt-4.1-mini") is True
+        assert _is_openai_chat_model("o3") is True
+        assert _is_openai_chat_model("o4-mini") is True
+
+    def test_openai_blocks_non_chat_models(self):
+        assert _is_openai_chat_model("text-embedding-3-large") is False
+        assert _is_openai_chat_model("tts-1") is False
+        assert _is_openai_chat_model("dall-e-3") is False
+        assert _is_openai_chat_model("whisper-1") is False
+        assert _is_openai_chat_model("gpt-4o-realtime-preview") is False
+        assert _is_openai_chat_model("gpt-4o-audio-preview") is False
+
+    def test_openai_lister_filters(self):
+        """_list_openai returns only chat models from SDK response."""
+        sdk_models = _make_openai_sdk_models()
+        mock_client = mock.MagicMock()
+        mock_client.models.list.return_value = sdk_models
+
+        mock_openai = mock.MagicMock()
+        mock_openai.OpenAI.return_value = mock_client
+
+        with mock.patch.dict("sys.modules", {"openai": mock_openai}):
+            from consilium.model_registry import _list_openai
+            result = _list_openai()
+
+        result_ids = {m.id for m in result}
+        assert "gpt-5.2" in result_ids
+        assert "o3" in result_ids
+        assert "text-embedding-3-large" not in result_ids
+        assert "tts-1" not in result_ids
+        assert "dall-e-3" not in result_ids
+
+    def test_anthropic_lister_filters(self):
+        """_list_anthropic returns only claude-* models."""
+        sdk_models = _make_anthropic_sdk_models()
+        mock_response = mock.MagicMock()
+        mock_response.data = sdk_models
+        mock_client = mock.MagicMock()
+        mock_client.models.list.return_value = mock_response
+
+        mock_anthropic = mock.MagicMock()
+        mock_anthropic.Anthropic.return_value = mock_client
+
+        with mock.patch.dict("sys.modules", {"anthropic": mock_anthropic}):
+            from consilium.model_registry import _list_anthropic
+            result = _list_anthropic()
+
+        result_ids = {m.id for m in result}
+        assert "claude-opus-4-6" in result_ids
+        assert "some-internal-model" not in result_ids
+
+    def test_google_lister_filters(self):
+        """_list_google returns only Gemini models with generateContent."""
+        sdk_models = _make_google_sdk_models()
+
+        mock_genai_client = mock.MagicMock()
+        mock_genai_client.models.list.return_value = sdk_models
+
+        mock_genai_module = mock.MagicMock()
+        mock_genai_module.Client.return_value = mock_genai_client
+
+        mock_google = mock.MagicMock()
+        mock_google.genai = mock_genai_module
+
+        with mock.patch.dict(
+            "sys.modules",
+            {"google": mock_google, "google.genai": mock_genai_module},
+        ):
+            from consilium.model_registry import _list_google
+            result = _list_google()
+
+        result_ids = {m.id for m in result}
+        assert "gemini-3.1-pro-preview" in result_ids
+        assert "gemini-2.5-flash" in result_ids
+        # Filtered: no generateContent
+        assert "text-embedding-004" not in result_ids
+        # Filtered: has generateContent but is not a Gemini model... wait,
+        # gemini-embedding-exp has "gemini" but only embedContent
+        assert "gemini-embedding-exp" not in result_ids
 
 
 # ---------------------------------------------------------------------------

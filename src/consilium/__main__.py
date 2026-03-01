@@ -17,7 +17,7 @@ import sys
 import textwrap
 
 from consilium.core import Council
-from consilium.providers import DEFAULT_CHAIRMAN, DEFAULT_MODELS
+from consilium.providers import DEFAULT_CHAIRMAN, get_default_models
 
 
 def _read_image(path: str) -> bytes:
@@ -74,10 +74,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("prompt", help="The question or prompt to send.")
     parser.add_argument(
         "--models",
-        default=",".join(DEFAULT_MODELS),
+        default=None,
         help=(
-            f"Comma-separated model identifiers. "
-            f"Default: {','.join(DEFAULT_MODELS)}"
+            "Comma-separated model identifiers. "
+            "Default: auto-detected latest flagship from each provider."
         ),
     )
     parser.add_argument(
@@ -115,7 +115,10 @@ def main(argv: list[str] | None = None) -> None:
 
     args = parser.parse_args(argv)
 
-    model_list = [m.strip() for m in args.models.split(",") if m.strip()]
+    if args.models is not None:
+        model_list = [m.strip() for m in args.models.split(",") if m.strip()]
+    else:
+        model_list = get_default_models()
 
     image_bytes = None
     if args.images:

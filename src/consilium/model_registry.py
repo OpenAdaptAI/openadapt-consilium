@@ -186,15 +186,34 @@ def _set_cached(provider: str, models: List[ModelInfo]) -> None:
 
 _SUPPORTED_PROVIDERS = {"openai", "anthropic", "google"}
 
+# ---------------------------------------------------------------------------
+# OpenAI chat-model filters
+# ---------------------------------------------------------------------------
+
+_OPENAI_ALLOW_RE = re.compile(r"^(gpt-|o[1-9])")
+_OPENAI_DENY_KEYWORDS = frozenset(
+    {"audio", "realtime", "tts", "dall-e", "whisper", "moderation", "embedding", "search"}
+)
+
+
+def _is_openai_chat_model(model_id: str) -> bool:
+    """Return True if *model_id* looks like an OpenAI chat/reasoning model."""
+    if not _OPENAI_ALLOW_RE.match(model_id):
+        return False
+    model_lower = model_id.lower()
+    return not any(kw in model_lower for kw in _OPENAI_DENY_KEYWORDS)
+
 
 def _list_openai() -> List[ModelInfo]:
-    """List models from OpenAI API."""
+    """List chat-capable models from OpenAI API."""
     import openai
 
     client = openai.OpenAI()
     response = client.models.list()
     models = []
     for m in response:
+        if not _is_openai_chat_model(m.id):
+            continue
         created_at = None
         if hasattr(m, "created") and m.created:
             created_at = datetime.fromtimestamp(m.created, tz=timezone.utc)
@@ -211,13 +230,16 @@ def _list_openai() -> List[ModelInfo]:
 
 
 def _list_anthropic() -> List[ModelInfo]:
-    """List models from Anthropic API."""
+    """List Claude models from Anthropic API."""
     import anthropic
 
     client = anthropic.Anthropic()
     response = client.models.list()
     models = []
     for m in response.data:
+        model_id = m.id
+        if not model_id.startswith("claude-"):
+            continue
         created_at = None
         if hasattr(m, "created_at") and m.created_at:
             if isinstance(m.created_at, str):
@@ -227,7 +249,6 @@ def _list_anthropic() -> List[ModelInfo]:
                     pass
             elif isinstance(m.created_at, datetime):
                 created_at = m.created_at
-        model_id = m.id
         display_name = getattr(m, "display_name", None) or model_id
         models.append(
             ModelInfo(
@@ -241,17 +262,24 @@ def _list_anthropic() -> List[ModelInfo]:
 
 
 def _list_google() -> List[ModelInfo]:
-    """List models from Google Generative AI API."""
+    """List Gemini content-generation models from Google API."""
     from google import genai
 
     client = genai.Client()
     response = client.models.list()
     models = []
     for m in response:
+        # Filter to models that support content generation
+        supported = getattr(m, "supported_actions", None) or []
+        if "generateContent" not in supported:
+            continue
         model_id = getattr(m, "name", str(m))
         # Google model names are prefixed with "models/"
         if model_id.startswith("models/"):
             model_id = model_id[len("models/"):]
+        # Only include Gemini models
+        if "gemini" not in model_id.lower():
+            continue
         display_name = getattr(m, "display_name", None) or model_id
         models.append(
             ModelInfo(
