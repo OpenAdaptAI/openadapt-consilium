@@ -12,22 +12,32 @@ from typing import Dict
 
 
 # Pricing per 1M tokens (input, output) in USD.
+# Updated March 2026. See provider pricing pages for current rates.
 MODEL_PRICING: Dict[str, tuple[float, float]] = {
-    # Anthropic
+    # Anthropic — Claude 4.6 (Feb 2026)
+    "claude-opus-4-6": (15.0, 75.0),
+    "claude-sonnet-4-6": (3.0, 15.0),
+    # Anthropic — Claude 4.5 (previous gen)
     "claude-haiku-4-5-20251001": (0.80, 4.0),
     "claude-sonnet-4-5-20250514": (3.0, 15.0),
-    "claude-opus-4-20250514": (15.0, 75.0),
-    # Google
+    "claude-opus-4-5": (15.0, 75.0),
+    # Google — Gemini 3.x (March 2026)
+    "gemini-3.1-pro-preview": (1.25, 10.0),
+    "gemini-3-flash-preview": (0.15, 0.60),
+    # Google — Gemini 2.5 (stable GA)
     "gemini-2.5-flash": (0.15, 0.60),
     "gemini-2.5-pro": (1.25, 10.0),
-    # OpenAI
+    # OpenAI — GPT-5.x series (current)
+    "gpt-5.2": (2.0, 8.0),
+    "gpt-5.2-pro": (10.0, 40.0),
+    "gpt-5": (2.0, 8.0),
+    "gpt-5-mini": (0.4, 1.6),
+    # OpenAI — GPT-4.x (non-reasoning)
     "gpt-4.1": (2.0, 8.0),
     "gpt-4.1-mini": (0.4, 1.6),
     "gpt-4.1-nano": (0.1, 0.4),
-    "gpt-4o": (2.5, 10.0),
-    "gpt-4o-mini": (0.15, 0.60),
+    # OpenAI — reasoning
     "o3": (2.0, 8.0),
-    "o3-mini": (1.1, 4.4),
     "o4-mini": (1.1, 4.4),
 }
 

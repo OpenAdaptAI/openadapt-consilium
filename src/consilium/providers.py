@@ -250,22 +250,31 @@ def query_model(
 # ---------------------------------------------------------------------------
 
 MODEL_ALIASES: Dict[str, tuple[str, str]] = {
-    # OpenAI
+    # OpenAI — GPT-5.x series (current flagships, March 2026)
+    "gpt-5.2": ("openai", "gpt-5.2"),
+    "gpt-5.2-pro": ("openai", "gpt-5.2-pro"),
+    "gpt-5": ("openai", "gpt-5"),
+    "gpt-5-mini": ("openai", "gpt-5-mini"),
+    # OpenAI — GPT-4.x series (non-reasoning)
     "gpt-4.1": ("openai", "gpt-4.1"),
     "gpt-4.1-mini": ("openai", "gpt-4.1-mini"),
     "gpt-4.1-nano": ("openai", "gpt-4.1-nano"),
-    "gpt-4o": ("openai", "gpt-4o"),
-    "gpt-4o-mini": ("openai", "gpt-4o-mini"),
+    # OpenAI — reasoning models
     "o3": ("openai", "o3"),
-    "o3-mini": ("openai", "o3-mini"),
     "o4-mini": ("openai", "o4-mini"),
-    # Anthropic
-    "claude-haiku-4-5-20251001": ("anthropic", "claude-haiku-4-5-20251001"),
-    "claude-sonnet-4-5-20250514": ("anthropic", "claude-sonnet-4-5-20250514"),
-    "claude-opus-4-20250514": ("anthropic", "claude-opus-4-20250514"),
-    # Google
-    "gemini-2.5-flash": ("google", "gemini-2.5-flash"),
+    # Anthropic — Claude 4.6 (current flagships, Feb 2026)
+    "claude-opus-4-6": ("anthropic", "claude-opus-4-6"),
+    "claude-sonnet-4-6": ("anthropic", "claude-sonnet-4-6"),
+    # Anthropic — Claude 4.5 (previous gen)
+    "claude-haiku-4-5": ("anthropic", "claude-haiku-4-5-20251001"),
+    "claude-sonnet-4-5": ("anthropic", "claude-sonnet-4-5-20250514"),
+    "claude-opus-4-5": ("anthropic", "claude-opus-4-5"),
+    # Google — Gemini 3.x (current flagships, March 2026)
+    "gemini-3.1-pro": ("google", "gemini-3.1-pro-preview"),
+    "gemini-3-flash": ("google", "gemini-3-flash-preview"),
+    # Google — Gemini 2.5 (stable GA)
     "gemini-2.5-pro": ("google", "gemini-2.5-pro"),
+    "gemini-2.5-flash": ("google", "gemini-2.5-flash"),
 }
 
 
@@ -289,9 +298,9 @@ def parse_model_string(model_str: str) -> ProviderConfig:
 
 # Default council composition — latest flagship from each provider
 DEFAULT_MODELS: List[str] = [
-    "gpt-4.1",
-    "claude-sonnet-4-5-20250514",
-    "gemini-2.5-pro",
+    "gpt-5.2",
+    "claude-sonnet-4-6",
+    "gemini-3.1-pro",
 ]
 
-DEFAULT_CHAIRMAN: str = "claude-sonnet-4-5-20250514"
+DEFAULT_CHAIRMAN: str = "claude-sonnet-4-6"

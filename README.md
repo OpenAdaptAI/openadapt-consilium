@@ -90,8 +90,8 @@ The main orchestrator class.
 from consilium import Council
 
 council = Council(
-    models=["gpt-4.1", "claude-sonnet-4-5-20250514", "gemini-2.5-pro"],
-    chairman="claude-sonnet-4-5-20250514",
+    models=["gpt-5.2", "claude-sonnet-4-6", "gemini-3.1-pro"],
+    chairman="claude-sonnet-4-6",
     max_workers=8,
 )
 ```
@@ -100,8 +100,8 @@ council = Council(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `models` | `list[str]` | `["gpt-4.1", "claude-sonnet-4-5-20250514", "gemini-2.5-pro"]` | Models to query in Stage 1 |
-| `chairman` | `str` | `"claude-sonnet-4-5-20250514"` | Model for Stage 3 synthesis |
+| `models` | `list[str]` | `["gpt-5.2", "claude-sonnet-4-6", "gemini-3.1-pro"]` | Models to query in Stage 1 |
+| `chairman` | `str` | `"claude-sonnet-4-6"` | Model for Stage 3 synthesis |
 | `max_workers` | `int` | `8` | Max parallel threads |
 
 #### `council.ask()`
@@ -138,7 +138,7 @@ from consilium import council_query
 result = council_query(
     "Analyze this screenshot and list the UI elements",
     images=[screenshot_bytes],
-    models=["gpt-4.1", "claude-sonnet-4-5-20250514"],
+    models=["gpt-5.2", "claude-sonnet-4-6"],
     budget=0.25,
     skip_review=True,  # fast mode: Stage 1 only
 )
@@ -154,7 +154,7 @@ print(result["cost"]["total_usd"])
   "final_answer": "...",
   "individual_responses": [
     {
-      "model": "openai/gpt-4.1",
+      "model": "openai/gpt-5.2",
       "text": "...",
       "latency_seconds": 2.1,
       "input_tokens": 1500,
@@ -164,7 +164,7 @@ print(result["cost"]["total_usd"])
   ],
   "reviews": [...],
   "cost": {
-    "breakdown": {"gpt-4.1": 0.007, "claude-sonnet-4-5-20250514": 0.012},
+    "breakdown": {"gpt-5.2": 0.007, "claude-sonnet-4-6": 0.012},
     "total_usd": 0.019,
     "total_input_tokens": 3000,
     "total_output_tokens": 800
@@ -179,8 +179,8 @@ print(result["cost"]["total_usd"])
 consilium "prompt" [OPTIONS]
 
 Options:
-  --models TEXT      Comma-separated model IDs (default: gpt-4.1,claude-sonnet-4-5-20250514,gemini-2.5-pro)
-  --chairman TEXT    Chairman model for synthesis (default: claude-sonnet-4-5-20250514)
+  --models TEXT      Comma-separated model IDs (default: gpt-5.2,claude-sonnet-4-6,gemini-3.1-pro)
+  --chairman TEXT    Chairman model for synthesis (default: claude-sonnet-4-6)
   --image PATH      Image file to include (repeatable)
   --budget FLOAT    Max spend in USD
   --no-review       Skip Stages 2-3 (faster, cheaper)
@@ -207,7 +207,7 @@ consilium "Write a haiku about AI" --budget 0.10
 consilium "List 3 colors" --json | jq '.final_answer'
 
 # Custom models
-consilium "Hello" --models gpt-4.1,gemini-2.5-pro --chairman gpt-4.1
+consilium "Hello" --models gpt-5.2,gemini-3.1-pro --chairman gpt-5.2
 ```
 
 ## Model Support
@@ -216,14 +216,14 @@ Consilium supports any model from these providers:
 
 | Provider | Models | Env Var |
 |----------|--------|---------|
-| OpenAI | `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano`, `o3`, `o4-mini` | `OPENAI_API_KEY` |
-| Anthropic | `claude-sonnet-4-5-20250514`, `claude-opus-4-20250514`, `claude-haiku-4-5-20251001` | `ANTHROPIC_API_KEY` |
-| Google | `gemini-2.5-pro`, `gemini-2.5-flash` | `GOOGLE_API_KEY` |
+| OpenAI | `gpt-5.2`, `gpt-5.2-pro`, `gpt-5`, `gpt-5-mini`, `gpt-5.2`, `o3`, `o4-mini` | `OPENAI_API_KEY` |
+| Anthropic | `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-sonnet-4-5` | `ANTHROPIC_API_KEY` |
+| Google | `gemini-3.1-pro`, `gemini-3-flash`, `gemini-3.1-pro`, `gemini-2.5-flash` | `GOOGLE_API_KEY` |
 
 Use any model with the `provider/model` format:
 
 ```python
-council = Council(models=["openai/gpt-4.1", "anthropic/claude-sonnet-4-5-20250514"])
+council = Council(models=["openai/gpt-5.2", "anthropic/claude-sonnet-4-6"])
 ```
 
 ## Budget Control

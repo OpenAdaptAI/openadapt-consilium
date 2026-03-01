@@ -73,8 +73,8 @@ def mock_query_slow():
 @pytest.fixture
 def sample_configs() -> list[ProviderConfig]:
     return [
-        ProviderConfig(provider="openai", model="gpt-4.1"),
-        ProviderConfig(provider="anthropic", model="claude-sonnet-4-5-20250514"),
+        ProviderConfig(provider="openai", model="gpt-5.2"),
+        ProviderConfig(provider="anthropic", model="claude-sonnet-4-6"),
         ProviderConfig(provider="google", model="gemini-2.5-pro"),
     ]
 
@@ -87,9 +87,10 @@ def sample_configs() -> list[ProviderConfig]:
 class TestCostTracking:
     def test_token_usage_cost(self):
         usage = TokenUsage(
-            model="gpt-4o", input_tokens=1_000_000, output_tokens=1_000_000
+            model="gpt-5.2", input_tokens=1_000_000, output_tokens=1_000_000
         )
-        assert abs(usage.cost_usd - 12.50) < 0.01
+        # gpt-5.2: $2.00/M input, $8.00/M output = $10.00
+        assert abs(usage.cost_usd - 10.00) < 0.01
 
     def test_token_usage_unknown_model(self):
         usage = TokenUsage(
@@ -101,33 +102,33 @@ class TestCostTracking:
 
     def test_cost_tracker_record(self):
         tracker = CostTracker()
-        tracker.record("gpt-4o", 500, 100)
-        tracker.record("gpt-4o", 300, 200)
+        tracker.record("gpt-5.2", 500, 100)
+        tracker.record("gpt-5.2", 300, 200)
         assert len(tracker.usages) == 2
         assert tracker.total_input_tokens == 800
         assert tracker.total_output_tokens == 300
 
     def test_cost_tracker_breakdown(self):
         tracker = CostTracker()
-        tracker.record("gpt-4o", 1000, 500)
-        tracker.record("claude-sonnet-4-5-20250514", 1000, 500)
+        tracker.record("gpt-5.2", 1000, 500)
+        tracker.record("claude-sonnet-4-6", 1000, 500)
         breakdown = tracker.breakdown_by_model()
-        assert "gpt-4o" in breakdown
-        assert "claude-sonnet-4-5-20250514" in breakdown
+        assert "gpt-5.2" in breakdown
+        assert "claude-sonnet-4-6" in breakdown
 
     def test_cost_tracker_exceeds_budget(self):
         tracker = CostTracker()
         assert not tracker.exceeds_budget(1.0)
         assert not tracker.exceeds_budget(None)
-        tracker.record("gpt-4o", 100_000, 100_000)
+        tracker.record("gpt-5.2", 100_000, 100_000)
         assert tracker.exceeds_budget(0.001)
 
     def test_cost_tracker_summary_format(self):
         tracker = CostTracker()
-        tracker.record("gpt-4o", 1000, 500)
+        tracker.record("gpt-5.2", 1000, 500)
         summary = tracker.summary()
         assert "Cost breakdown:" in summary
-        assert "gpt-4o" in summary
+        assert "gpt-5.2" in summary
         assert "TOTAL:" in summary
         assert "Tokens:" in summary
 
@@ -139,19 +140,19 @@ class TestCostTracking:
 
 class TestProviders:
     def test_parse_model_with_slash(self):
-        cfg = parse_model_string("openai/gpt-4.1")
+        cfg = parse_model_string("openai/gpt-5.2")
         assert cfg.provider == "openai"
-        assert cfg.model == "gpt-4.1"
+        assert cfg.model == "gpt-5.2"
 
     def test_parse_model_alias(self):
-        cfg = parse_model_string("gpt-4.1")
+        cfg = parse_model_string("gpt-5.2")
         assert cfg.provider == "openai"
-        assert cfg.model == "gpt-4.1"
+        assert cfg.model == "gpt-5.2"
 
     def test_parse_model_anthropic_alias(self):
-        cfg = parse_model_string("claude-sonnet-4-5-20250514")
+        cfg = parse_model_string("claude-sonnet-4-6")
         assert cfg.provider == "anthropic"
-        assert cfg.model == "claude-sonnet-4-5-20250514"
+        assert cfg.model == "claude-sonnet-4-6"
 
     def test_parse_model_google_alias(self):
         cfg = parse_model_string("gemini-2.5-pro")
@@ -168,8 +169,8 @@ class TestProviders:
             query_model(cfg, "hello")
 
     def test_display_name(self):
-        cfg = ProviderConfig(provider="openai", model="gpt-4.1")
-        assert cfg.display_name == "openai/gpt-4.1"
+        cfg = ProviderConfig(provider="openai", model="gpt-5.2")
+        assert cfg.display_name == "openai/gpt-5.2"
 
 
 # ---------------------------------------------------------------------------
@@ -181,20 +182,20 @@ class TestAnonymization:
     def test_anonymize_basic(self):
         responses = [
             IndividualResponse(
-                model="openai/gpt-4.1",
+                model="openai/gpt-5.2",
                 text="Answer one",
                 latency_seconds=1.0,
-                usage=TokenUsage(model="gpt-4.1"),
+                usage=TokenUsage(model="gpt-5.2"),
             ),
             IndividualResponse(
-                model="anthropic/claude-sonnet-4-5-20250514",
+                model="anthropic/claude-sonnet-4-6",
                 text="Answer two",
                 latency_seconds=1.0,
-                usage=TokenUsage(model="claude-sonnet-4-5-20250514"),
+                usage=TokenUsage(model="claude-sonnet-4-6"),
             ),
         ]
         result = _anonymize_responses(responses)
-        assert "gpt-4.1" not in result
+        assert "gpt-5.2" not in result
         assert "claude" not in result
         assert "Response A" in result
         assert "Response B" in result
@@ -278,7 +279,7 @@ class TestCouncil:
         def sometimes_fail(
             config, prompt, images=None, system=None, json_schema=None
         ):
-            if config.model == "gpt-4.1":
+            if config.model == "gpt-5.2":
                 raise RuntimeError("API timeout")
             return _fake_query(config, prompt, images, system, json_schema)
 
@@ -322,8 +323,8 @@ class TestCouncil:
 
     def test_with_string_models(self, mock_query):
         council = Council(
-            models=["gpt-4.1", "claude-sonnet-4-5-20250514"],
-            chairman="gpt-4.1",
+            models=["gpt-5.2", "claude-sonnet-4-6"],
+            chairman="gpt-5.2",
         )
         result = council.ask("Test", skip_review=True)
         assert len(result.individual_responses) == 2
@@ -345,7 +346,7 @@ class TestSDK:
     def test_council_query_returns_dict(self, mock_query):
         result = council_query(
             "What is 2+2?",
-            models=["gpt-4.1", "claude-sonnet-4-5-20250514"],
+            models=["gpt-5.2", "claude-sonnet-4-6"],
             skip_review=True,
         )
         assert isinstance(result, dict)
@@ -357,7 +358,7 @@ class TestSDK:
 
     def test_council_query_response_structure(self, mock_query):
         result = council_query(
-            "Test", models=["gpt-4.1"], skip_review=True
+            "Test", models=["gpt-5.2"], skip_review=True
         )
         resp = result["individual_responses"][0]
         assert "model" in resp
@@ -368,7 +369,7 @@ class TestSDK:
         assert "cost_usd" in resp
 
     def test_council_query_cost_structure(self, mock_query):
-        result = council_query("Test", models=["gpt-4.1"], skip_review=True)
+        result = council_query("Test", models=["gpt-5.2"], skip_review=True)
         cost = result["cost"]
         assert "breakdown" in cost
         assert "total_usd" in cost
@@ -376,7 +377,7 @@ class TestSDK:
         assert "total_output_tokens" in cost
 
     def test_council_query_serializable(self, mock_query):
-        result = council_query("Test", models=["gpt-4.1"], skip_review=True)
+        result = council_query("Test", models=["gpt-5.2"], skip_review=True)
         serialized = json.dumps(result)
         assert isinstance(serialized, str)
         round_tripped = json.loads(serialized)
@@ -392,7 +393,7 @@ class TestCLI:
     def test_cli_basic(self, mock_query, capsys):
         from consilium.__main__ import main
 
-        main(["What is 2+2?", "--models", "gpt-4.1", "--no-review"])
+        main(["What is 2+2?", "--models", "gpt-5.2", "--no-review"])
         captured = capsys.readouterr()
         assert "INDIVIDUAL RESPONSES" in captured.out
         assert "Cost breakdown:" in captured.out
@@ -400,7 +401,7 @@ class TestCLI:
     def test_cli_json_output(self, mock_query, capsys):
         from consilium.__main__ import main
 
-        main(["Test", "--models", "gpt-4.1", "--no-review", "--json"])
+        main(["Test", "--models", "gpt-5.2", "--no-review", "--json"])
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert "final_answer" in data
@@ -408,7 +409,7 @@ class TestCLI:
     def test_cli_budget(self, mock_query, capsys):
         from consilium.__main__ import main
 
-        main(["Test", "--models", "gpt-4.1", "--budget", "0.50"])
+        main(["Test", "--models", "gpt-5.2", "--budget", "0.50"])
         captured = capsys.readouterr()
         assert "Cost breakdown:" in captured.out
 
@@ -419,7 +420,7 @@ class TestCLI:
             [
                 "Test",
                 "--models",
-                "gpt-4.1,claude-sonnet-4-5-20250514",
+                "gpt-5.2,claude-sonnet-4-6",
             ]
         )
         captured = capsys.readouterr()
@@ -436,8 +437,8 @@ class TestCLI:
 class TestIntegration:
     def test_full_three_stage_flow(self, mock_query):
         council = Council(
-            models=["gpt-4.1", "claude-sonnet-4-5-20250514", "gemini-2.5-pro"],
-            chairman="claude-sonnet-4-5-20250514",
+            models=["gpt-5.2", "claude-sonnet-4-6", "gemini-2.5-pro"],
+            chairman="claude-sonnet-4-6",
         )
         result = council.ask("Explain quantum computing in one paragraph.")
 
@@ -449,7 +450,7 @@ class TestIntegration:
         assert result.total_cost > 0
 
     def test_single_model_council(self, mock_query):
-        council = Council(models=["gpt-4.1"], chairman="gpt-4.1")
+        council = Council(models=["gpt-5.2"], chairman="gpt-5.2")
         result = council.ask("Test")
 
         assert len(result.individual_responses) == 1
@@ -457,7 +458,7 @@ class TestIntegration:
         assert result.final_answer
 
     def test_result_to_dict_roundtrip(self, mock_query):
-        council = Council(models=["gpt-4.1"], chairman="gpt-4.1")
+        council = Council(models=["gpt-5.2"], chairman="gpt-5.2")
         result = council.ask("Test", skip_review=True)
         d = _result_to_dict(result)
         s = json.dumps(d)
