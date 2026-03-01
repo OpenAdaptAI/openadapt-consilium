@@ -620,9 +620,9 @@ class TestGetDefaultModels:
             result = get_default_models()
 
         assert len(result) == 3
-        assert "gpt-5.2" in result
-        assert "claude-opus-4-6" in result
-        assert "gemini-3.1-pro-preview" in result
+        assert "openai/gpt-5.2" in result
+        assert "anthropic/claude-opus-4-6" in result
+        assert "google/gemini-3.1-pro-preview" in result
 
     def test_falls_back_to_defaults_on_error(self):
         with mock.patch(
@@ -632,10 +632,10 @@ class TestGetDefaultModels:
             result = get_default_models()
 
         assert len(result) == 3
-        # Should use fallback defaults
-        assert DEFAULTS["openai"]["flagship"] in result
-        assert DEFAULTS["anthropic"]["flagship"] in result
-        assert DEFAULTS["google"]["flagship"] in result
+        # Should use fallback defaults in "provider/model_id" format
+        assert f"openai/{DEFAULTS['openai']['flagship']}" in result
+        assert f"anthropic/{DEFAULTS['anthropic']['flagship']}" in result
+        assert f"google/{DEFAULTS['google']['flagship']}" in result
 
 
 # ---------------------------------------------------------------------------

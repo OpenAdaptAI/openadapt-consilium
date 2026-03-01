@@ -382,13 +382,17 @@ def get_latest(provider: str, tier: str = "flagship") -> str:
 
 
 def get_default_models() -> List[str]:
-    """Return a list of default model IDs (one flagship per provider).
+    """Return a list of default models (one flagship per provider).
+
+    Each entry is in ``"provider/model_id"`` format so that
+    :func:`consilium.providers.parse_model_string` can resolve the
+    provider without needing an alias lookup.
 
     Tries :func:`get_latest` for each provider, falling back to
     hardcoded defaults on any error.
 
     Returns:
-        List of model ID strings.
+        List of ``"provider/model_id"`` strings.
     """
     result = []
     for provider, tiers in DEFAULTS.items():
@@ -398,5 +402,5 @@ def get_default_models() -> List[str]:
             model_id = get_latest(provider, tier=default_tier)
         except Exception:
             model_id = fallback
-        result.append(model_id)
+        result.append(f"{provider}/{model_id}")
     return result

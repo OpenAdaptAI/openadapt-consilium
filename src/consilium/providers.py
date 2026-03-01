@@ -290,6 +290,20 @@ def parse_model_string(model_str: str) -> ProviderConfig:
         provider, model = MODEL_ALIASES[model_str]
         return ProviderConfig(provider=provider, model=model)
 
+    # Infer provider from well-known model name patterns as a fallback.
+    _PROVIDER_PATTERNS = [
+        ("claude", "anthropic"),
+        ("gpt-", "openai"),
+        ("o1", "openai"),
+        ("o3", "openai"),
+        ("o4", "openai"),
+        ("gemini", "google"),
+    ]
+    model_lower = model_str.lower()
+    for pattern, provider in _PROVIDER_PATTERNS:
+        if pattern in model_lower:
+            return ProviderConfig(provider=provider, model=model_str)
+
     raise ValueError(
         f"Cannot parse model '{model_str}'. Use 'provider/model' format "
         f"or one of: {sorted(MODEL_ALIASES.keys())}"
