@@ -194,7 +194,7 @@ _OPENAI_ALLOW_RE = re.compile(r"^(gpt-|o[1-9])")
 _OPENAI_DENY_KEYWORDS = frozenset(
     {
         "audio", "realtime", "tts", "dall-e", "whisper", "moderation",
-        "embedding", "search", "image", "transcribe",
+        "embedding", "search", "image", "transcribe", "codex", "instruct",
     }
 )
 

@@ -414,44 +414,22 @@ class TestListModels:
         mock_genai_client = mock.MagicMock()
         mock_genai_client.models.list.return_value = sdk_models
 
-        mock_genai = mock.MagicMock()
-        mock_genai.Client.return_value = mock_genai_client
+        mock_genai_module = mock.MagicMock()
+        mock_genai_module.Client.return_value = mock_genai_client
+
+        mock_google = mock.MagicMock()
+        mock_google.genai = mock_genai_module
 
         with mock.patch.dict(
-            "sys.modules", {"google": mock.MagicMock(), "google.genai": mock_genai}
+            "sys.modules",
+            {"google": mock_google, "google.genai": mock_genai_module},
         ):
-            # Patch the import inside _list_google
-            with mock.patch(
-                "consilium.model_registry._list_google"
-            ) as mock_lister:
-                # Simulate what _list_google does with the SDK models
-                filtered = []
-                for m in sdk_models:
-                    actions = getattr(m, "supported_actions", []) or []
-                    if "generateContent" not in actions:
-                        continue
-                    model_id = m.name
-                    if model_id.startswith("models/"):
-                        model_id = model_id[len("models/"):]
-                    if "gemini" not in model_id.lower():
-                        continue
-                    filtered.append(
-                        ModelInfo(
-                            id=model_id,
-                            provider="google",
-                            display_name=m.display_name,
-                        )
-                    )
-                mock_lister.return_value = filtered
+            from consilium.model_registry import _list_google
+            result = _list_google()
 
-                with mock.patch.dict(
-                    _PROVIDER_LISTERS, {"google": mock_lister}
-                ):
-                    result = list_models("google")
-
-        # Only 4 Gemini models with generateContent should remain
-        # (text-embedding-004 has embedContent only, gemini-embedding-exp
-        # has embedContent only)
+        # 4 Gemini models with generateContent remain; text-embedding-004
+        # (embedContent only) and gemini-embedding-exp (embedContent only)
+        # are filtered out.
         assert len(result) == 4
         assert result[0].id == "gemini-3.1-pro-preview"
         assert result[0].display_name == "Gemini 3.1 Pro Preview"
@@ -677,6 +655,8 @@ class TestFiltering:
         assert _is_openai_chat_model("gpt-4o-audio-preview") is False
         assert _is_openai_chat_model("gpt-image-1") is False
         assert _is_openai_chat_model("gpt-4o-transcribe") is False
+        assert _is_openai_chat_model("gpt-5-codex") is False
+        assert _is_openai_chat_model("gpt-3.5-turbo-instruct") is False
 
     def test_openai_lister_filters(self):
         """_list_openai returns only chat models from SDK response."""
@@ -740,10 +720,8 @@ class TestFiltering:
         result_ids = {m.id for m in result}
         assert "gemini-3.1-pro-preview" in result_ids
         assert "gemini-2.5-flash" in result_ids
-        # Filtered: no generateContent
+        # Filtered: embedContent only (no generateContent)
         assert "text-embedding-004" not in result_ids
-        # Filtered: has generateContent but is not a Gemini model... wait,
-        # gemini-embedding-exp has "gemini" but only embedContent
         assert "gemini-embedding-exp" not in result_ids
 
 
