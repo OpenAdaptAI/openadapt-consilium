@@ -1,5 +1,5 @@
 [project]
-name = "consilium"
+name = "openadapt-consilium"
 version = "0.3.1"
 description = "Multi-LLM council for consensus-driven AI responses"
 readme = "README.md"
