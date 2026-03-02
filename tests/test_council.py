@@ -314,7 +314,7 @@ class TestCouncil:
                 models=sample_configs[:1], chairman=sample_configs[0]
             )
             fake_image = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
-            result = council.ask(
+            council.ask(
                 "Describe this", images=[fake_image], skip_review=True
             )
 

@@ -12,12 +12,11 @@ import concurrent.futures
 import dataclasses
 import string
 import time
-from typing import Any, Dict, List
+from typing import Dict, List
 
 from consilium.cost import CostTracker, TokenUsage
 from consilium.providers import (
     DEFAULT_CHAIRMAN,
-    DEFAULT_MODELS,
     ProviderConfig,
     get_default_models,
     parse_model_string,
