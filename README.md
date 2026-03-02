@@ -41,13 +41,13 @@ Consilium queries multiple LLMs in parallel, has each model review the others' r
 ## Installation
 
 ```bash
-pip install git+https://github.com/abrichr/consilium.git
+pip install git+https://github.com/OpenAdaptAI/openadapt-consilium.git
 ```
 
 Or for development:
 
 ```bash
-git clone https://github.com/abrichr/consilium.git
+git clone https://github.com/OpenAdaptAI/openadapt-consilium.git
 cd consilium
 pip install -e ".[dev]"
 ```
@@ -251,7 +251,7 @@ for r in result.individual_responses:
 ## Development
 
 ```bash
-git clone https://github.com/abrichr/consilium.git
+git clone https://github.com/OpenAdaptAI/openadapt-consilium.git
 cd consilium
 pip install -e ".[dev]"
 pytest
