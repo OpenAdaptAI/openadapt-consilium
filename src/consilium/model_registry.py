@@ -49,7 +49,7 @@ class ModelInfo:
 
 DEFAULTS: Dict[str, Dict[str, str]] = {
     "openai": {
-        "flagship": "gpt-5.2",
+        "flagship": "gpt-5.4",
         "fast": "gpt-5-mini",
         "reasoning": "o3",
         "reasoning_fast": "o4-mini",
