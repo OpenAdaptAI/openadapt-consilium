@@ -4,7 +4,7 @@ Usage::
 
     consilium "What color is the sky?"
     consilium "Describe this screenshot" --image screenshot.png
-    consilium "Hello" --models gpt-5.2,claude-sonnet-4-6 --no-review
+    consilium "Hello" --models gpt-5.4,claude-sonnet-4-6 --no-review
     consilium "Plan a trip" --budget 0.50
     consilium "Compare approaches" --json
 """

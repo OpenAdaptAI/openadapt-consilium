@@ -28,6 +28,7 @@ MODEL_PRICING: Dict[str, tuple[float, float]] = {
     "gemini-2.5-flash": (0.15, 0.60),
     "gemini-2.5-pro": (1.25, 10.0),
     # OpenAI — GPT-5.x series (current)
+    "gpt-5.4": (2.0, 8.0),
     "gpt-5.2": (2.0, 8.0),
     "gpt-5.2-pro": (10.0, 40.0),
     "gpt-5": (2.0, 8.0),
